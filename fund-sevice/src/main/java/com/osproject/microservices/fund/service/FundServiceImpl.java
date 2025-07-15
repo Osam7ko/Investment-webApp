@@ -6,9 +6,11 @@ import com.osproject.microservices.fund.dto.response.FundResponse;
 import com.osproject.microservices.fund.entity.FundEntity;
 import com.osproject.microservices.fund.repository.FundRepository;
 import com.osproject.microservices.fund.utils.FundUtils;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,8 +22,11 @@ public class FundServiceImpl implements FundService {
 
     private final FundRepository fundRepository;
 
+    private final RestTemplate restTemplate;
+
 
     @Override
+    @CircuitBreaker(name = "pricingService", fallbackMethod = "getDefaultPrice")
     public FundResponse createFund(FundDto fundDto) {
         /**
          * Check the fund id
@@ -42,8 +47,15 @@ public class FundServiceImpl implements FundService {
                 .assetType(fundDto.assetType())
                 .assetTypeSubCategory(fundDto.assetTypeSubCategory())
                 .expenseRatio(fundDto.expenseRatio())
-                .nav(fundDto.nav())
                 .build();
+
+        try {
+            String url = "http://PRICING-SERVICE/api/v1/price/" + fundDto.fundId();
+            Double price = restTemplate.getForObject(url, Double.class);
+            newFund.setNav(price);
+        } catch (Exception e) {
+            throw new RuntimeException("Pricing service is not avaliable");
+        }
 
         FundEntity savedFund = fundRepository.save(newFund);
 
@@ -58,6 +70,32 @@ public class FundServiceImpl implements FundService {
                         .assetTypeSubCategory(savedFund.getAssetTypeSubCategory())
                         .expenseRatio(savedFund.getExpenseRatio())
                         .nav(savedFund.getNav())
+                        .build())
+                .build();
+    }
+
+    // Fallback method
+    private FundResponse getDefaultPrice(FundDto fundDto, Throwable t) {
+        FundEntity fallbackFund = FundEntity.builder()
+                .fundName(fundDto.fundName())
+                .description(fundDto.description())
+                .assetType(fundDto.assetType())
+                .assetTypeSubCategory(fundDto.assetTypeSubCategory())
+                .expenseRatio(fundDto.expenseRatio())
+                .nav(0.0)
+                .build();
+
+        return FundResponse.builder()
+                .responseCode("FALLBACK")
+                .responseMessage("Pricing service unavailable, using default NAV")
+                .fundInfo(FundInfo.builder()
+                        .fundName(fallbackFund.getFundName())
+                        .fundId(fallbackFund.getFundId())
+                        .description(fallbackFund.getDescription())
+                        .assetType(fallbackFund.getAssetType())
+                        .assetTypeSubCategory(fallbackFund.getAssetTypeSubCategory())
+                        .expenseRatio(fallbackFund.getExpenseRatio())
+                        .nav(fallbackFund.getNav())
                         .build())
                 .build();
     }
