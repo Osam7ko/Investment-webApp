@@ -1,5 +1,7 @@
 package com.osproject.microservices.userservice.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.osproject.microservices.userservice.dto.*;
 import com.osproject.microservices.userservice.dto.response.AccountResponse;
 import com.osproject.microservices.userservice.dto.response.InvestmentResponse;
@@ -12,7 +14,7 @@ import com.osproject.microservices.userservice.utils.AccountUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +27,11 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
 
-    private final WebClient webClient;
+    // Web client config
+//    private final WebClient webClient;
+
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
 
     @Override
@@ -207,7 +213,7 @@ public class UserServiceImpl implements UserService {
     // Investment
 
     @Override
-    public InvestmentResponse createInvestment(Long id, InvestmentDto investmentDto) {
+    public InvestmentResponse createInvestment(Long id, InvestmentDto investmentDto) throws JsonProcessingException {
         /**
          * Check if the user exists,
          * check if the account exists
@@ -232,12 +238,22 @@ public class UserServiceImpl implements UserService {
                 .amount(investmentDto.amount())
                 .build();
 
-        // Call Fund Api's
+        // Call Fund Api's Using Web Client
+        /*
         FundDto fundInfo = webClient.get()
                 .uri("http://localhost:8081/api/v1/fund/" + newInvestment.getFundId())
                 .retrieve()
                 .bodyToMono(FundDto.class)
                 .block();
+                 */
+
+        // Call Fund Api using Rest Template
+//        String url = "http://localhost:8081/api/v1/fund/" + newInvestment.getFundId();
+        //After creating eureka
+        String url = "http://FUND-SEVICE/api/v1/fund/" + newInvestment.getFundId();
+        String response = restTemplate.getForObject(url, String.class);
+        FundDto fundInfo = objectMapper.readValue(response, FundDto.class);
+
         double unitOfPurchased = newInvestment.getAmount() / fundInfo.nav();
         newInvestment.setUnitsOfPurchased(unitOfPurchased);
         newInvestment.setCurrentInvestmentValue(unitOfPurchased * fundInfo.nav());

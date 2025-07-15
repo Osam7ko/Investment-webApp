@@ -1,5 +1,6 @@
 package com.osproject.microservices.userservice.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.osproject.microservices.userservice.dto.*;
 import com.osproject.microservices.userservice.dto.response.AccountResponse;
 import com.osproject.microservices.userservice.dto.response.InvestmentResponse;
@@ -22,7 +23,7 @@ public interface UserService {
 
     AccountResponse deleteAccount(Long id, String accountNumber);
 
-    InvestmentResponse createInvestment(Long id, InvestmentDto accountDto);
+    InvestmentResponse createInvestment(Long id, InvestmentDto accountDto) throws JsonProcessingException;
 
     List<InvestmentInfo> getInvestments(Long userId);
 

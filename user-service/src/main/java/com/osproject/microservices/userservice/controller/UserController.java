@@ -1,5 +1,6 @@
 package com.osproject.microservices.userservice.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.osproject.microservices.userservice.dto.*;
 import com.osproject.microservices.userservice.dto.response.AccountResponse;
 import com.osproject.microservices.userservice.dto.response.InvestmentResponse;
@@ -66,7 +67,7 @@ public class UserController {
 
     @PostMapping("/investment/{id}")
     @ResponseStatus(HttpStatus.CREATED)
-    public InvestmentResponse createInvestment(@PathVariable Long id, @RequestBody InvestmentDto investmentDto) {
+    public InvestmentResponse createInvestment(@PathVariable Long id, @RequestBody InvestmentDto investmentDto) throws JsonProcessingException {
         return userService.createInvestment(id, investmentDto);
     }
 
