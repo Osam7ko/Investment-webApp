@@ -14,6 +14,9 @@ public interface FundService {
 
     FundInfo getById(int id);
 
+    FundResponse updateFund(int id, FundDto fundDto);
+
     FundResponse deleteFund(int id);
+
 
 }

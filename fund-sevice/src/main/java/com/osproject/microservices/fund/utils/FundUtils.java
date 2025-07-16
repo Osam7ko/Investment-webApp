@@ -11,6 +11,8 @@ public class FundUtils {
     public static final String FUND_NOT_EXISTS_MESSAGE = "The Fund is not exists!";
     public static final String FUND_DELETE_CODE = "004";
     public static final String FUND_DELETE_MESSAGE = "Fund has been Deleted Successfully!";
+    public static final String FUND_UPDATE_CODE = "005";
+    public static final String FUND_UPDATE_MESSAGE = "Fund has been updated Successfully!";
 
 //    // Accounts
 //    public static final String ACCOUNT_EXISTS_CODE = "005";

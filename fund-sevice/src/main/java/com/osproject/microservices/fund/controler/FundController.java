@@ -5,6 +5,8 @@ import com.osproject.microservices.fund.dto.FundInfo;
 import com.osproject.microservices.fund.dto.response.FundResponse;
 import com.osproject.microservices.fund.service.FundService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +18,8 @@ import java.util.List;
 public class FundController {
 
     private final FundService fundService;
+
+    private final CacheManager cacheManager;
 
 
     @PostMapping
@@ -36,9 +40,20 @@ public class FundController {
         return fundService.getById(id);
     }
 
+    @PutMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public FundResponse updateFund(@PathVariable int id, @RequestBody FundDto fundDto) {
+        return fundService.updateFund(id, fundDto);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
     public FundResponse deleteFund(@PathVariable int id) {
         return fundService.deleteFund(id);
+    }
+
+    @GetMapping("/getCache")
+    public Cache getCacheInfo() {
+        return cacheManager.getCache("fund");
     }
 }

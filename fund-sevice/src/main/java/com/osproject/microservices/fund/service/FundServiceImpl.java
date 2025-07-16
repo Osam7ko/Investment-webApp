@@ -8,6 +8,10 @@ import com.osproject.microservices.fund.repository.FundRepository;
 import com.osproject.microservices.fund.utils.FundUtils;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -41,13 +45,7 @@ public class FundServiceImpl implements FundService {
                     .build();
         }
 
-        FundEntity newFund = FundEntity.builder()
-                .fundName(fundDto.fundName())
-                .description(fundDto.description())
-                .assetType(fundDto.assetType())
-                .assetTypeSubCategory(fundDto.assetTypeSubCategory())
-                .expenseRatio(fundDto.expenseRatio())
-                .build();
+        FundEntity newFund = buildFundEntityFromDto(fundDto);
 
         try {
             String url = "http://PRICING-SERVICE/api/v1/price/" + fundDto.fundId();
@@ -62,15 +60,7 @@ public class FundServiceImpl implements FundService {
         return FundResponse.builder()
                 .responseCode(FundUtils.FUND_CREATION_CODE)
                 .responseMessage(FundUtils.FUND_CREATION_MESSAGE)
-                .fundInfo(FundInfo.builder()
-                        .fundName(savedFund.getFundName())
-                        .fundId(savedFund.getFundId())
-                        .description(savedFund.getDescription())
-                        .assetType(savedFund.getAssetType())
-                        .assetTypeSubCategory(savedFund.getAssetTypeSubCategory())
-                        .expenseRatio(savedFund.getExpenseRatio())
-                        .nav(savedFund.getNav())
-                        .build())
+                .fundInfo(mapToFundInfo(savedFund))
                 .build();
     }
 
@@ -88,19 +78,13 @@ public class FundServiceImpl implements FundService {
         return FundResponse.builder()
                 .responseCode("FALLBACK")
                 .responseMessage("Pricing service unavailable, using default NAV")
-                .fundInfo(FundInfo.builder()
-                        .fundName(fallbackFund.getFundName())
-                        .fundId(fallbackFund.getFundId())
-                        .description(fallbackFund.getDescription())
-                        .assetType(fallbackFund.getAssetType())
-                        .assetTypeSubCategory(fallbackFund.getAssetTypeSubCategory())
-                        .expenseRatio(fallbackFund.getExpenseRatio())
-                        .nav(fallbackFund.getNav())
-                        .build())
+                .fundInfo(mapToFundInfo(fallbackFund))
                 .build();
     }
 
     @Override
+    @Cacheable(value = "fund", key = "#fundId", condition = "#fundId > 1")
+    @Transactional(readOnly = true)
     public List<FundInfo> getFunds(int fundId) {
         if (fundId == -1) {
             return fundRepository.findAll().stream()
@@ -114,14 +98,49 @@ public class FundServiceImpl implements FundService {
     }
 
     @Override
+    @Cacheable(value = "fund", key = "#id")
+    @Transactional(readOnly = true)
     public FundInfo getById(int id) {
         FundEntity fund = fundRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Fund not found"));
         return mapToFundInfo(fund);
     }
 
+    @Override
+    @CachePut(value = "fund", key = "#id")
+    public FundResponse updateFund(int id, FundDto fundDto) {
+        /**
+         * Check the fund id
+         * create new fund
+         */
+        if (!fundRepository.existsById(id)) {
+            return FundResponse.builder()
+                    .responseCode(FundUtils.FUND_NOT_EXISTS_CODE)
+                    .responseMessage(FundUtils.FUND_NOT_EXISTS_MESSAGE)
+                    .fundInfo(null)
+                    .build();
+        }
+
+        FundEntity fund = fundRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Fund not found"));
+
+        fund.setFundName(fundDto.fundName());
+        fund.setDescription(fundDto.description());
+        fund.setAssetType(fund.getAssetType());
+        fund.setAssetTypeSubCategory(fundDto.assetTypeSubCategory());
+
+        FundEntity savedFund = fundRepository.save(fund);
+
+        return FundResponse.builder()
+                .responseCode(FundUtils.FUND_UPDATE_CODE)
+                .responseMessage(FundUtils.FUND_UPDATE_MESSAGE)
+                .fundInfo(mapToFundInfo(savedFund))
+                .build();
+    }
+
     @Transactional
     @Override
+    @Cacheable(value = "fund", key = "#id")
     public FundResponse deleteFund(int id) {
 
         if (!fundRepository.existsById(id)) {
@@ -155,5 +174,22 @@ public class FundServiceImpl implements FundService {
                 .expenseRatio(fund.getExpenseRatio())
                 .nav(fund.getNav())
                 .build();
+    }
+
+    private FundEntity buildFundEntityFromDto(FundDto dto) {
+        return FundEntity.builder()
+                .fundName(dto.fundName())
+                .description(dto.description())
+                .assetType(dto.assetType())
+                .assetTypeSubCategory(dto.assetTypeSubCategory())
+                .expenseRatio(dto.expenseRatio())
+                .build();
+    }
+
+    // While the cache application is SIMPLE
+    @Scheduled(fixedRate = 20000)
+    @CacheEvict(value = "fund", allEntries = true)
+    public void clearFundCache() {
+        System.out.println("Cache is cleared now");
     }
 }
